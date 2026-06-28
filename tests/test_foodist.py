@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from scrapers.base import Exhibitor  # noqa: E402
+from scrapers.email_finder import find_email  # noqa: E402
 from scrapers.foodist_expo import FoodistExpoScraper, _clean  # noqa: E402
 
 DETAIL_HTML = """
@@ -60,8 +61,46 @@ def test_parse_detail_fields():
     assert ex.sector == "Olive Oil; Black Olives"
 
 
+HOME_HTML = """
+<html><body>
+  <header>Welcome to ACME Foods</header>
+  <a href="/en/iletisim/">İletişim</a>
+  <a href="https://facebook.com/acme">Facebook</a>
+</body></html>
+"""
+
+CONTACT_HTML = """
+<html><body>
+  <h1>İletişim</h1>
+  <p>Phone: +90 555 000 0000</p>
+  <p>E-mail: info (at) acmefoods (dot) com</p>
+  <a href="mailto:export@acmefoods.com">export@acmefoods.com</a>
+  <a href="mailto:noreply@acmefoods.com">noreply</a>
+</body></html>
+"""
+
+
+def test_find_email_follows_contact_page_and_ranks():
+    pages = {
+        "https://acmefoods.com/": HOME_HTML,
+        "https://acmefoods.com/en/iletisim/": CONTACT_HTML,
+    }
+
+    def fake_fetch(url):
+        return pages.get(url)
+
+    # export@ is preferred over info@/noreply@, and the brand domain matches.
+    assert find_email("acmefoods.com", fake_fetch) == "export@acmefoods.com"
+
+
+def test_find_email_empty_when_no_site():
+    assert find_email("", lambda url: None) == ""
+
+
 if __name__ == "__main__":
     test_clean_collapses_whitespace_and_combining_marks()
     test_decode_cfemail()
     test_parse_detail_fields()
+    test_find_email_follows_contact_page_and_ranks()
+    test_find_email_empty_when_no_site()
     print("All tests passed.")

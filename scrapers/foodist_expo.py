@@ -33,6 +33,7 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 
 from scrapers.base import BaseScraper, Exhibitor
+from scrapers.email_finder import find_email
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +55,12 @@ class FoodistExpoScraper(BaseScraper):
     base_url = "https://www.foodistexpo.com"
     list_url = "https://www.foodistexpo.com/en/exhibitor-list"
 
+    def __init__(self, *args, find_emails: bool = False, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        # When True, follow each company's own website to recover an e-mail the
+        # directory doesn't publish.
+        self.find_emails = find_emails
+
     # ------------------------------------------------------------------
     # Public entry point
     # ------------------------------------------------------------------
@@ -70,6 +77,10 @@ class FoodistExpoScraper(BaseScraper):
             logger.info("Page %d/%d: %d exhibitors", page, last_page, len(cards))
             for ex in cards:
                 self._enrich_from_detail(ex)
+                if self.find_emails and not ex.email and ex.website:
+                    ex.email = find_email(ex.website, self.fetch_external)
+                    if ex.email:
+                        logger.debug("Found e-mail for %s: %s", ex.name, ex.email)
                 exhibitors.append(ex)
         return exhibitors
 

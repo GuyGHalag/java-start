@@ -52,6 +52,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Seconds to wait between HTTP requests (default: 1.0).",
     )
     parser.add_argument(
+        "--find-emails",
+        action="store_true",
+        help=(
+            "Recover missing e-mails by following each company's own website "
+            "to its contact page. Slower (visits external sites)."
+        ),
+    )
+    parser.add_argument(
         "--out-dir",
         default="output",
         help="Directory for the CSV/JSON output (default: output).",
@@ -89,7 +97,15 @@ def main(argv=None) -> int:
     if not args.site:
         build_parser().error("--site is required (or use --list-sites)")
 
-    scraper = SCRAPERS[args.site](delay=args.delay)
+    scraper_cls = SCRAPERS[args.site]
+    kwargs = {"delay": args.delay}
+    if args.find_emails:
+        # Only scrapers that support e-mail discovery accept this kwarg.
+        if "find_emails" in scraper_cls.__init__.__code__.co_varnames:
+            kwargs["find_emails"] = True
+        else:
+            logging.warning("--find-emails is not supported by site '%s'", args.site)
+    scraper = scraper_cls(**kwargs)
     exhibitors = scraper.scrape(max_pages=args.max_pages)
 
     if not exhibitors:
@@ -110,12 +126,14 @@ def main(argv=None) -> int:
     with_site = sum(1 for e in exhibitors if e.website)
     with_phone = sum(1 for e in exhibitors if e.phone)
     with_addr = sum(1 for e in exhibitors if e.address)
+    with_email = sum(1 for e in exhibitors if e.email)
     logging.info(
-        "Coverage: %d total | website %d | phone %d | address %d",
+        "Coverage: %d total | website %d | phone %d | address %d | email %d",
         len(exhibitors),
         with_site,
         with_phone,
         with_addr,
+        with_email,
     )
     return 0
 

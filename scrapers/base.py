@@ -148,6 +148,23 @@ class BaseScraper:
         logger.error("GET %s failed after %d attempts", url, self.max_retries)
         return None
 
+    def fetch_external(self, url: str, timeout: float = 15.0) -> Optional[str]:
+        """Best-effort fetch of an *external* (company) site.
+
+        Unlike :meth:`get`, this makes a single attempt with a short timeout and
+        no long backoff, so a slow or dead company website cannot stall a run.
+        Follows redirects and returns the response text on HTTP 200, else None.
+        """
+        self._respect_rate_limit()
+        try:
+            resp = self.session.get(url, timeout=timeout, allow_redirects=True)
+            self._last_request_ts = time.monotonic()
+            if resp.status_code == 200 and resp.text:
+                return resp.text
+        except requests.RequestException as exc:
+            logger.debug("external GET %s failed: %s", url, exc)
+        return None
+
     def _respect_rate_limit(self) -> None:
         if self.delay <= 0:
             return
