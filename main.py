@@ -24,7 +24,7 @@ import os
 import sys
 
 from scrapers import SCRAPERS
-from scrapers.base import save_csv, save_json
+from scrapers.base import dedupe, save_csv, save_json
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -111,6 +111,11 @@ def main(argv=None) -> int:
     if not exhibitors:
         logging.error("No exhibitors scraped.")
         return 1
+
+    before = len(exhibitors)
+    exhibitors = dedupe(exhibitors)
+    if len(exhibitors) != before:
+        logging.info("De-duplicated %d -> %d rows", before, len(exhibitors))
 
     os.makedirs(args.out_dir, exist_ok=True)
     base = os.path.join(args.out_dir, args.site)

@@ -181,6 +181,31 @@ class BaseScraper:
 # -- Output helpers ------------------------------------------------------
 
 
+def dedupe(exhibitors: Iterable[Exhibitor]) -> List[Exhibitor]:
+    """Drop duplicate exhibitors (same detail page or name).
+
+    Some directories list a company more than once; such rows share the same
+    detail URL. We keep the first occurrence but merge in any non-empty field
+    from later duplicates so the surviving row is as complete as possible.
+    """
+    out: List[Exhibitor] = []
+    index: dict = {}
+    for ex in exhibitors:
+        key = ex.detail_url or ex.name.strip().lower()
+        if not key:
+            out.append(ex)
+            continue
+        if key in index:
+            kept = index[key]
+            for field_name in Exhibitor.CSV_FIELDS:
+                if not getattr(kept, field_name) and getattr(ex, field_name):
+                    setattr(kept, field_name, getattr(ex, field_name))
+        else:
+            index[key] = ex
+            out.append(ex)
+    return out
+
+
 def save_csv(exhibitors: Iterable[Exhibitor], path: str) -> int:
     rows = list(exhibitors)
     with open(path, "w", newline="", encoding="utf-8-sig") as fh:
